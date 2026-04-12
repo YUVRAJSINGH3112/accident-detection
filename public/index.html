@@ -461,7 +461,7 @@
         updateMotionDebug('📱 Android motion detection starting...');
         
         try {
-          window.addEventListener('devicemotion', onDeviceMotion);
+          window.addEventListener('devicemotion', onDeviceMotion,true);
           updateMotionStatus('✅ Motion sensor ACTIVE (Android)');
           addLog('✓ Android Motion sensors enabled', 'success');
           updateMotionDebug('✅ Motion listener active');
@@ -480,34 +480,41 @@
       }
     }
 
-    function onDeviceMotion(event) {
-      const acceleration = event.accelerationIncludingGravity;
-      
-      if (!acceleration) {
-        updateMotionDebug('⚠️ No acceleration data');
-        return;
-      }
+    // 🔥 (ye variable top me ek baar define karna)
+let lastAcceleration = 0;
 
-      const x = acceleration.x || 0;
-      const y = acceleration.y || 0;
-      const z = acceleration.z || 0;
+function onDeviceMotion(event) {
+  const acc = event.accelerationIncludingGravity;
 
-      // Calculate total acceleration magnitude
-      const totalAcceleration = Math.sqrt(x * x + y * y + z * z);
+  if (!acc) {
+    updateMotionDebug('⚠️ No acceleration data');
+    return;
+  }
 
-      // Update acceleration display
-      document.getElementById('accelerationValue').innerHTML = 
-        `📊 Acceleration: ${totalAcceleration.toFixed(2)} m/s² (X:${x.toFixed(2)}, Y:${y.toFixed(2)}, Z:${z.toFixed(2)})`;
+  const x = acc.x || 0;
+  const y = acc.y || 0;
+  const z = acc.z || 0;
 
-      // Debug: Show acceleration in debug line
-      updateMotionDebug(`Current: ${totalAcceleration.toFixed(2)} m/s² | Threshold: ${shakeThreshold} m/s²`);
+  // ✅ current magnitude
+  const current = Math.sqrt(x * x + y * y + z * z);
 
-      // Detect shake (when acceleration exceeds threshold)
-      if (totalAcceleration > shakeThreshold) {
-        console.log(`🚨 SHAKE DETECTED! Acceleration: ${totalAcceleration.toFixed(2)} m/s²`);
-        detectShake();
-      }
-    }
+  // ✅ delta (sudden change)
+  const delta = Math.abs(current - lastAcceleration);
+
+  lastAcceleration = current;
+
+  // UI update
+  document.getElementById('accelerationValue').innerHTML =
+    `📊 Acc: ${current.toFixed(2)} | Δ: ${delta.toFixed(2)}`;
+
+  updateMotionDebug(`Δ: ${delta.toFixed(2)} | Threshold: 5`);
+
+  // 🔥 Shake detection
+  if (delta > 5) {
+    console.log("🚨 SHAKE DETECTED");
+    detectShake();
+  }
+}
 
     function detectShake() {
       const now = Date.now();
@@ -554,185 +561,183 @@
 
     // ============ GEOLOCATION ============
 
-    function initializeGeolocation() {
-      if ('geolocation' in navigator) {
-        console.log('Starting continuous location tracking...');
-        updateMotionDebug('📍 Starting location tracking...');
+ // 🔥 ADD THIS GLOBAL VARIABLE (top me add karna)
+let lastGeoFetchTime = 0;
+
+function initializeGeolocation() {
+  if ('geolocation' in navigator) {
+    console.log('Starting continuous location tracking...');
+    updateMotionDebug('📍 Starting location tracking...');
+    
+    locationWatchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+
+        // ✅ FIX: old values preserve (NO flicker)
+        currentLocation = {
+          lat: lat,
+          lng: lng,
+          accuracy: position.coords.accuracy.toFixed(0),
+          altitude: position.coords.altitude ? position.coords.altitude.toFixed(0) : 'N/A',
+          timestamp: new Date().toLocaleTimeString(),
+          fullTimestamp: new Date().toISOString(),
+          speed: position.coords.speed ? position.coords.speed.toFixed(2) : '0.00',
+
+          address: currentLocation?.address || 'Fetching...',
+          city: currentLocation?.city || 'Getting city...',
+          pincode: currentLocation?.pincode || 'Getting pincode...'
+        };
+
+        // ✅ Smooth UI update
+        updateLocationDisplay(currentLocation);
+
+        // Save location
+        saveLocationToStorage(currentLocation);
+
+        // ✅ FIX: throttle reverse geolocation (10 sec)
+        const now = Date.now();
+        if (now - lastGeoFetchTime > 10000) {
+          getReverseGeolocation(lat, lng);
+          lastGeoFetchTime = now;
+        }
+
+        console.log('Location updated:', lat, lng);
+      },
+      (error) => {
+        console.warn('Geolocation error:', error);
+        let errorMsg = 'Location: ';
         
-        // Watch position with high accuracy
-        locationWatchId = navigator.geolocation.watchPosition(
-          (position) => {
-            const lat = position.coords.latitude.toFixed(6);
-            const lng = position.coords.longitude.toFixed(6);
-            
-            currentLocation = {
-              lat: lat,
-              lng: lng,
-              accuracy: position.coords.accuracy.toFixed(0),
-              altitude: position.coords.altitude ? position.coords.altitude.toFixed(0) : 'N/A',
-              timestamp: new Date().toLocaleTimeString(),
-              fullTimestamp: new Date().toISOString(),
-              speed: position.coords.speed ? position.coords.speed.toFixed(2) : '0.00',
-              address: 'Fetching...',
-              city: 'Getting city...',
-              pincode: 'Getting pincode...'
-            };
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMsg += '❌ Permission denied';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMsg += '❌ Position unavailable';
+            break;
+          case error.TIMEOUT:
+            errorMsg += '❌ Request timeout';
+            break;
+          default:
+            errorMsg += '❌ Unknown error';
+        }
+        
+        document.getElementById('locationStatus').innerHTML = errorMsg;
+        updateMotionDebug('⚠️ Location error: ' + error.message);
+        addLog('⚠️ Location error: ' + error.message, 'alert');
 
-            // Save location to localStorage permanently
-            saveLocationToStorage(currentLocation);
-            
-            // Update UI with coordinates first
-            updateLocationDisplay(currentLocation);
-            
-            // Get reverse geolocation (address, city, pin code)
-            getReverseGeolocation(lat, lng);
-            
-            console.log('Location updated:', lat, lng);
-          },
-          (error) => {
-            console.warn('Geolocation error:', error);
-            let errorMsg = 'Location: ';
-            
-            switch(error.code) {
-              case error.PERMISSION_DENIED:
-                errorMsg += '❌ Permission denied - Enable in settings';
-                break;
-              case error.POSITION_UNAVAILABLE:
-                errorMsg += '❌ Position unavailable - Try outdoors';
-                break;
-              case error.TIMEOUT:
-                errorMsg += '❌ Request timeout - Try again';
-                break;
-              default:
-                errorMsg += '❌ Unknown error';
-            }
-            
-            document.getElementById('locationStatus').innerHTML = errorMsg;
-            updateMotionDebug('⚠️ Location error: ' + error.message);
-            addLog('⚠️ Location error: ' + error.message, 'alert');
-            
-            // Show last saved location if available
-            showLastSavedLocation();
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
-          }
-        );
-      } else {
-        document.getElementById('locationStatus').innerHTML = 
-          `❌ Geolocation not supported`;
-        addLog('✗ Geolocation not supported', 'alert');
         showLastSavedLocation();
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000 // 🔥 smoother updates
       }
+    );
+  } else {
+    document.getElementById('locationStatus').innerHTML = `❌ Geolocation not supported`;
+    addLog('✗ Geolocation not supported', 'alert');
+    showLastSavedLocation();
+  }
+}
+
+// ============ REVERSE GEOLOCATION ============
+
+function getReverseGeolocation(lat, lng) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+  
+  fetch(url)
+    .then(response => response.json())
+    .then(data => {
+      const address = data.address || {};
+      const city = address.city || address.town || address.village || 'Unknown';
+      const pincode = address.postcode || 'N/A';
+      const country = address.country || 'Unknown';
+      const state = address.state || '';
+
+      // ✅ update only when data comes
+      currentLocation.address = `${city}, ${state}, ${country}`;
+      currentLocation.city = city;
+      currentLocation.pincode = pincode;
+
+      saveLocationToStorage(currentLocation);
+      updateLocationDisplay(currentLocation);
+
+      console.log('Updated address:', currentLocation.address);
+    })
+    .catch(error => {
+      console.warn('Reverse geolocation error:', error);
+    });
+}
+
+// ============ UI DISPLAY ============
+
+function updateLocationDisplay(location) {
+  const html = `
+    📍 <strong>${location.address || location.city || 'Loading...'}</strong><br>
+    📮 <strong>Pin Code: ${location.pincode || 'N/A'}</strong><br>
+    <small>Coordinates: ${location.lat}, ${location.lng}</small><br>
+    🎯 Accuracy: ±${location.accuracy}m | 📏 Altitude: ${location.altitude}m<br>
+    ⏰ Time: ${location.timestamp}<br>
+    💨 Speed: ${location.speed} m/s
+  `;
+  document.getElementById('locationStatus').innerHTML = html;
+}
+
+// ============ STORAGE ============
+
+function saveLocationToStorage(location) {
+  try {
+    localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(location));
+
+    let history = JSON.parse(localStorage.getItem(LOCATION_HISTORY_KEY) || '[]');
+    history.push({
+      ...location,
+      savedAt: new Date().toISOString()
+    });
+
+    if (history.length > 50) {
+      history = history.slice(-50);
     }
 
-    // Reverse Geolocation: Convert coordinates to address
-    function getReverseGeolocation(lat, lng) {
-      // Using OpenStreetMap Nominatim API (free, no key needed)
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-      
-      fetch(url)
-        .then(response => response.json())
-        .then(data => {
-          console.log('Reverse geolocation data:', data);
-          
-          // Extract address details
-          const address = data.address || {};
-          const city = address.city || address.town || address.village || 'Unknown';
-          const pincode = address.postcode || 'N/A';
-          const country = address.country || 'Unknown';
-          const state = address.state || '';
-          
-          // Update current location with address info
-          currentLocation.address = `${city}, ${state}, ${country}`;
-          currentLocation.city = city;
-          currentLocation.pincode = pincode;
-          currentLocation.country = country;
-          currentLocation.state = state;
-          
-          // Save updated location
-          saveLocationToStorage(currentLocation);
-          
-          // Update display with address
-          updateLocationDisplay(currentLocation);
-          
-          console.log('Address:', currentLocation.address);
-          console.log('Pincode:', pincode);
-        })
-        .catch(error => {
-          console.warn('Reverse geolocation error:', error);
-          // Continue without address - coordinates are still valid
-        });
-    }
+    localStorage.setItem(LOCATION_HISTORY_KEY, JSON.stringify(history));
+  } catch (e) {
+    console.warn('Storage error:', e);
+  }
+}
 
-    function updateLocationDisplay(location) {
+// ============ LAST LOCATION ============
+
+function showLastSavedLocation() {
+  try {
+    const lastLocation = localStorage.getItem(LOCATION_STORAGE_KEY);
+
+    if (lastLocation) {
+      const location = JSON.parse(lastLocation);
+
       const html = `
-        📍 <strong>${location.address || location.city || 'Getting location...'}</strong><br>
-        📮 <strong>Pin Code: ${location.pincode || 'N/A'}</strong><br>
-        <small>Coordinates: ${location.lat}, ${location.lng}</small><br>
-        🎯 Accuracy: ±${location.accuracy}m | 📏 Altitude: ${location.altitude}m<br>
-        ⏰ Time: ${location.timestamp}<br>
-        💨 Speed: ${location.speed} m/s
+        📍 <strong>LAST SAVED: ${location.address || location.city}</strong><br>
+        📮 <strong>Pin Code: ${location.pincode}</strong><br>
+        <small>${location.lat}, ${location.lng}</small><br>
+        ⏰ ${location.timestamp}
       `;
+
       document.getElementById('locationStatus').innerHTML = html;
     }
+  } catch (e) {
+    console.warn('Error reading last location:', e);
+  }
+}
 
-    function saveLocationToStorage(location) {
-      try {
-        // Save current location as last known location
-        localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(location));
-        
-        // Add to location history
-        let history = JSON.parse(localStorage.getItem(LOCATION_HISTORY_KEY) || '[]');
-        history.push({
-          ...location,
-          savedAt: new Date().toISOString()
-        });
-        
-        // Keep only last 50 locations
-        if (history.length > 50) {
-          history = history.slice(-50);
-        }
-        
-        localStorage.setItem(LOCATION_HISTORY_KEY, JSON.stringify(history));
-        console.log('Location saved to storage');
-      } catch (e) {
-        console.warn('Could not save location to storage:', e);
-      }
-    }
+// ============ HISTORY ============
 
-    function showLastSavedLocation() {
-      try {
-        const lastLocation = localStorage.getItem(LOCATION_STORAGE_KEY);
-        
-        if (lastLocation) {
-          const location = JSON.parse(lastLocation);
-          const html = `
-            📍 <strong>LAST SAVED: ${location.address || location.city || 'Unknown'}</strong><br>
-            📮 <strong>Pin Code: ${location.pincode || 'N/A'}</strong><br>
-            <small>Coordinates: ${location.lat}, ${location.lng}</small><br>
-            🎯 Accuracy: ±${location.accuracy}m<br>
-            ⏰ Last Update: ${location.timestamp}<br>
-            ⚠️ (Device may be offline or location unavailable)
-          `;
-          document.getElementById('locationStatus').innerHTML = html;
-          console.log('Showing last saved location:', location);
-        }
-      } catch (e) {
-        console.warn('Could not retrieve last saved location:', e);
-      }
-    }
-
-    function getLocationHistory() {
-      try {
-        return JSON.parse(localStorage.getItem(LOCATION_HISTORY_KEY) || '[]');
-      } catch (e) {
-        return [];
-      }
-    }
-
+function getLocationHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCATION_HISTORY_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
     // ============ Socket Events ============
 
     socket.on('connect', () => {
