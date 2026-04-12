@@ -28,7 +28,7 @@ let connectedClients = 0;
 
 // REST API
 app.post('/accident', (req, res) => {
-  io.emit('accident_detected', {
+  io.to('hospital').emit('accident_detected', {
     message: 'Accident detected via REST API!',
     timestamp: new Date(),
     detectionTime: new Date().toLocaleTimeString(),
@@ -42,14 +42,22 @@ app.post('/accident', (req, res) => {
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
+//Hospital admin page
+app.get('/hospital', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'hospital.html'));
+});
 // SOCKET
 io.on('connection', (socket) => {
   connectedClients++;
   io.emit('client_count', connectedClients);
 
+  // hospital join
+  socket.on('join_hospital', () => {
+  socket.join('hospital');
+  console.log(`🏥 Hospital joined: ${socket.id}`);
+  });
   socket.on('movement', (data) => {
-    io.emit('accident_detected', {
+    io.to('hospital').emit('accident_detected', {
       message: 'Accident detected!',
       timestamp: new Date(),
       source: data.sensorType || 'Movement Sensor',
@@ -58,7 +66,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('manual_alert', (data) => {
-    io.emit('accident_detected', {
+    io.to('hospital').emit('accident_detected', {
       message: data.message || 'Manual alert',
       timestamp: new Date(),
       source: 'Manual Alert',
