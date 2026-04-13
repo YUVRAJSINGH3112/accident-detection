@@ -2,262 +2,397 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Suraksha | Tactical Command Center</title>
-
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Suraksha | Sentinel Node</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  
   <style>
     :root {
-      --bg: #030712;
-      --card-bg: rgba(17, 24, 39, 0.8);
-      --accent: #00f2ff;
+      --primary: #00f2ff;
       --danger: #ff0055;
-      --border: rgba(0, 242, 255, 0.2);
-      --map-shadow: 0 0 40px rgba(0, 242, 255, 0.1);
+      --bg: #020617;
+      --panel: rgba(15, 23, 42, 0.75);
+      --glass-border: rgba(0, 242, 255, 0.15);
     }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: 'Space Grotesk', sans-serif;
-      margin: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
       background: var(--bg);
-      color: #e2e8f0;
+      color: #f8fafc;
+      min-height: 100vh;
       display: flex;
-      height: 100vh;
+      justify-content: center;
+      align-items: center;
+      padding: 15px;
       overflow: hidden;
-      padding: 20px;
-      box-sizing: border-box;
-      gap: 20px;
+      position: relative;
     }
 
+    /* --- AUTOMATED BACKGROUND HOVER EFFECT --- */
     body::before {
       content: "";
       position: absolute;
       inset: 0;
-      background-image: radial-gradient(var(--border) 1px, transparent 1px);
-      background-size: 30px 30px;
-      opacity: 0.2;
+      background: 
+        radial-gradient(circle at 20% 30%, rgba(0, 242, 255, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(255, 0, 85, 0.08) 0%, transparent 50%);
+      z-index: -1;
+      animation: bgPulse 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgPulse {
+      0% { transform: scale(1) rotate(0deg); opacity: 0.6; }
+      100% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+    }
+
+    /* Sublte grid overlay */
+    body::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(0, 242, 255, 0.05) 1px, transparent 1px);
+      background-size: 25px 25px;
       z-index: -1;
     }
 
-    #sidebar {
-      width: 400px;
-      background: var(--card-bg);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      display: flex;
-      flex-direction: column;
-      box-shadow: var(--map-shadow);
-    }
-
-    .sidebar-header {
-      padding: 25px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    h2 {
-      margin: 0;
-      font-size: 1.4rem;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--accent);
-      text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
-    }
-
-    #data-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-    }
-
-    .incident-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border);
-      padding: 15px;
-      margin-bottom: 15px;
-      border-radius: 8px;
-      transition: 0.3s;
-      animation: slideIn 0.4s ease-out;
-    }
-
-    /* Map Box Wrapper with AUTOMATIC animation */
-    .map-wrapper {
-      flex: 1;
+    .container {
+      background: var(--panel);
+      backdrop-filter: blur(25px);
+      border: 1px solid var(--glass-border);
+      border-radius: 28px;
+      width: 100%;
+      max-width: 440px;
+      padding: 30px;
       position: relative;
-      border-radius: 12px;
-      border: 1px solid var(--border);
       overflow: hidden;
-      background: #000;
-      /* Automatic 1.5s breathing effect */
-      animation: autoGlow 1.5s ease-in-out infinite alternate;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+      /* Automated Hover/Glow Animation */
+      animation: containerGlow 3s ease-in-out infinite alternate, float 6s ease-in-out infinite;
     }
 
-    #map {
+    @keyframes containerGlow {
+      0% { 
+        border-color: var(--glass-border);
+        box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
+      }
+      100% { 
+        border-color: var(--primary);
+        box-shadow: 0 0 35px rgba(0, 242, 255, 0.25);
+      }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    /* Scanning line effect */
+    .container::before {
+      content: "";
+      position: absolute;
+      top: -100%;
+      left: 0;
       width: 100%;
       height: 100%;
-      filter: grayscale(0.5) contrast(1.2) brightness(0.8);
-      /* Automatic 1.5s zooming effect */
-      animation: autoZoom 1.5s ease-in-out infinite alternate;
-    }
-
-    /* Animation for the Border and Shadow Glow */
-    @keyframes autoGlow {
-      0% {
-        border-color: var(--border);
-        box-shadow: 0 0 20px rgba(0, 242, 255, 0.1);
-      }
-      100% {
-        border-color: var(--accent);
-        box-shadow: 0 0 50px rgba(0, 242, 255, 0.3);
-      }
-    }
-
-    /* Animation for the Map Zoom and Color Clarity */
-    @keyframes autoZoom {
-      0% {
-        transform: scale(1);
-        filter: grayscale(0.5) contrast(1.2) brightness(0.8);
-      }
-      100% {
-        transform: scale(1.04);
-        filter: grayscale(0.1) contrast(1.1) brightness(0.95);
-      }
-    }
-
-    .hud-corner {
-      position: absolute;
-      width: 30px;
-      height: 30px;
-      border: 2px solid var(--accent);
-      z-index: 1000;
+      background: linear-gradient(transparent, rgba(0, 242, 255, 0.05), transparent);
+      animation: scan 4s linear infinite;
       pointer-events: none;
-      opacity: 0.6;
     }
-    .top-left { top: 15px; left: 15px; border-right: 0; border-bottom: 0; }
-    .top-right { top: 15px; right: 15px; border-left: 0; border-bottom: 0; }
-    .bottom-left { bottom: 15px; left: 15px; border-right: 0; border-top: 0; }
-    .bottom-right { bottom: 15px; right: 15px; border-left: 0; border-top: 0; }
 
-    .btn-action {
-      margin-top: 15px;
-      width: 100%;
-      padding: 12px;
-      background: transparent;
-      border: 1px solid var(--accent);
-      color: var(--accent);
-      font-weight: bold;
+    @keyframes scan {
+      0% { top: -100%; }
+      100% { top: 100%; }
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 24px;
+      letter-spacing: 1px;
+      text-align: center;
+      margin-bottom: 5px;
+      background: linear-gradient(to right, #fff, var(--primary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
       text-transform: uppercase;
-      cursor: pointer;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      font-size: 11px;
+      text-align: center;
+      margin-bottom: 25px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      font-weight: 700;
+    }
+
+    /* Status & HUD Styling */
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 25px;
+    }
+
+    .status-tile {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--glass-border);
+      padding: 15px;
+      border-radius: 16px;
+      text-align: center;
       transition: 0.3s;
     }
 
-    .btn-action:hover {
-      background: var(--accent);
-      color: #000;
+    .status-label {
+      font-size: 9px;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
     }
 
-    .marker-ripple {
-      width: 15px; height: 15px;
+    .status-val {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #475569;
+      transition: 0.5s;
+    }
+    .connected .dot { background: #10b981; box-shadow: 0 0 10px #10b981; }
+
+    .sensor-hud {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 20px;
+      padding: 22px;
+      margin-bottom: 25px;
+      border-left: 3px solid var(--primary);
+    }
+
+    .hud-line {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+
+    .hud-label { color: #64748b; font-weight: 600; }
+    .hud-value { color: var(--primary); font-family: 'Space Grotesk', monospace; font-weight: bold; }
+
+    /* Action Buttons */
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.3s;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+
+    .btn-secondary { 
+      background: transparent; 
+      color: var(--primary); 
+      border: 1px solid var(--primary); 
+    }
+    .btn-secondary:active { background: rgba(0, 242, 255, 0.1); transform: scale(0.95); }
+
+    .btn-danger { 
+      background: var(--danger); 
+      color: #fff; 
+      box-shadow: 0 8px 15px rgba(255, 0, 85, 0.2); 
+    }
+    .btn-danger:active { transform: scale(0.95); }
+
+    /* Top Alert Banner */
+    .alert-box {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 400px;
       background: var(--danger);
-      border-radius: 50%;
-      box-shadow: 0 0 15px var(--danger);
-      position: relative;
-    }
-    .marker-ripple::after {
-      content: ""; position: absolute; inset: 0;
-      border: 2px solid var(--danger);
-      border-radius: 50%;
-      animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(1); opacity: 1; }
-      100% { transform: scale(4); opacity: 0; }
+      padding: 18px;
+      border-radius: 15px;
+      display: none;
+      z-index: 2000;
+      text-align: center;
+      color: white;
+      box-shadow: 0 10px 30px rgba(255, 0, 85, 0.5);
+      border: 2px solid rgba(255, 255, 255, 0.2);
     }
 
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+    .logs {
+      height: 90px;
+      overflow-y: auto;
+      font-size: 10px;
+      color: #94a3b8;
+      font-family: monospace;
+      padding: 12px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.05);
     }
+
+    .log-alert { color: var(--danger); font-weight: bold; }
   </style>
 </head>
 <body>
 
-<aside id="sidebar">
-  <div class="sidebar-header">
-    <h2>📡 Emergency Dashboard</h2>
-    <small style="color: var(--danger); font-weight: bold;">LIVE_LOCATION_ACTIVE</small>
+  <div class="alert-box" id="alertBox">
+    <strong id="alertTitle">⚠️ CRITICAL: ALERT BROADCASTED</strong>
   </div>
-  
-  <div id="data-container">
-    <div id="empty-state" style="text-align: center; margin-top: 50px; opacity: 0.5;">
-      [ SCANNING GRID... ]
+
+  <div class="container">
+    <h1>SURAKSHA ALERT</h1>
+    <p class="subtitle">Tactical Node Feed</p>
+
+    <div class="status-grid">
+      <div class="status-tile" id="connTile">
+        <div class="status-label">Network Link</div>
+        <div class="status-val" id="connectionStatus">
+          <div class="dot"></div> <span class="status-text">OFFLINE</span>
+        </div>
+      </div>
+      <div class="status-tile">
+        <div class="status-label">Active Hubs</div>
+        <div class="status-val" id="clientCount" style="color: var(--primary);">00</div>
+      </div>
     </div>
+
+    <div class="sensor-hud">
+      <div class="hud-line">
+        <span class="hud-label">SENSORS</span>
+        <span class="hud-value" id="motionStatus" style="color: #10b981;">ONLINE</span>
+      </div>
+      <div class="hud-line">
+        <span class="hud-label">ACCEL_DELTA</span>
+        <span class="hud-value" id="accelerationValue">0.00 m/s²</span>
+      </div>
+      <div class="hud-line">
+        <span class="hud-label">GPS_COORDS</span>
+        <span class="hud-value" id="locationStatus">WAITING...</span>
+      </div>
+      <div class="hud-line" style="margin-top: 10px; opacity: 0.5; font-size: 9px;">
+        <span id="motionDebug">CORE_READY</span>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn-secondary" onclick="simulateDesktopMotion()">Simulate</button>
+      <button class="btn-danger" id="alertBtn" onclick="sendManualAlert()">🚨 SOS</button>
+    </div>
+
+    <button onclick="showLocationHistoryPopup()" style="width: 100%; margin-bottom: 15px; background: rgba(255,255,255,0.03); color: #64748b; border: 1px solid rgba(255,255,255,0.05); font-size: 9px; padding: 10px;">
+        ACCESS ENCRYPTED LOGS
+    </button>
+
+    <div class="logs" id="logs"></div>
   </div>
-</aside>
 
-<div class="map-wrapper">
-  <div class="hud-corner top-left"></div>
-  <div class="hud-corner top-right"></div>
-  <div class="hud-corner bottom-left"></div>
-  <div class="hud-corner bottom-right"></div>
-  
-  <div id="map"></div>
-</div>
+  <script>
+    const socket = io();
+    let currentLocation = null;
+    let lastAcceleration = 0;
+    const shakeCooldown = 3000;
+    let lastShakeTime = 0;
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-
-<script>
-  const socket = io();
-  socket.emit('join_hospital');
-
-  const map = L.map('map', { 
-    zoomControl: false, 
-    attributionControl: false 
-  }).setView([26.8467, 80.9462], 13);
-
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-
-  const dataContainer = document.getElementById("data-container");
-
-  socket.on('accident_detected', (data) => {
-    document.getElementById('empty-state')?.remove();
-
-    const loc = data.sensorData?.location;
-    if (!loc) return;
-
-    const lat = parseFloat(loc.lat);
-    const lng = parseFloat(loc.lng);
-
-    const customIcon = L.divIcon({
-      className: 'custom-marker',
-      html: '<div class="marker-ripple"></div>',
-      iconSize: [15, 15]
+    socket.on('connect', () => {
+      const tile = document.getElementById('connTile');
+      tile.classList.add('connected');
+      document.getElementById('connectionStatus').querySelector('.status-text').innerText = 'ENCRYPTED';
+      initializeMotionDetection();
+      initializeGeolocation();
+      addLog('✓ Secure Link Established');
     });
 
-    L.marker([lat, lng], { icon: customIcon }).addTo(map);
-    map.flyTo([lat, lng], 15);
+    socket.on('client_count', (count) => {
+      document.getElementById('clientCount').innerText = count.toString().padStart(2, '0');
+    });
 
-    const card = document.createElement('div');
-    card.className = 'incident-card';
-    card.innerHTML = `
-      <div style="font-size: 0.7rem; color: var(--danger); margin-bottom: 5px;">▶ CRITICAL DETECTED</div>
-      <h3 style="margin: 0; font-size: 1rem;">SEC: ${Math.floor(lat)}.${Math.floor(lng)}</h3>
-      <p style="font-size: 0.8rem; color: #94a3b8; margin: 10px 0;">
-        Time: ${new Date().toLocaleTimeString()}<br>
-        Source: ${data.source || 'REMOTE_NODE'}
-      </p>
-      <button class="btn-action" onclick="window.open('https://www.google.com/maps?q=${lat},${lng}')">
-        NAVIGATE
-      </button>
-    `;
+    function onDeviceMotion(event) {
+        const acc = event.accelerationIncludingGravity;
+        if (!acc) return;
+        const current = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
+        const delta = Math.abs(current - lastAcceleration);
+        lastAcceleration = current;
 
-    dataContainer.insertBefore(card, dataContainer.firstChild);
-  });
-</script>
+        document.getElementById('accelerationValue').innerText = `${current.toFixed(2)} m/s²`;
+        if (delta > 5.5) detectShake(); // Slightly more filtered
+    }
 
+    function detectShake() {
+        const now = Date.now();
+        if (now - lastShakeTime > shakeCooldown) {
+            lastShakeTime = now;
+            socket.emit('movement', {
+                sensorType: 'Node Accelerometer',
+                location: currentLocation || { lat: '0.00', lng: '0.00' },
+                detectionTime: new Date().toLocaleTimeString()
+            });
+            showBannerAlert();
+            addLog('🚨 IMPACT DETECTED', 'log-alert');
+        }
+    }
+
+    function showBannerAlert() {
+        const banner = document.getElementById('alertBox');
+        banner.style.display = 'block';
+        setTimeout(() => banner.style.display = 'none', 3000);
+    }
+
+    function addLog(msg, className = '') {
+        const logs = document.getElementById('logs');
+        logs.innerHTML = `<div class="log-entry ${className}">[${new Date().toLocaleTimeString()}] ${msg}</div>` + logs.innerHTML;
+    }
+
+    function initializeMotionDetection() {
+        if (typeof DeviceMotionEvent !== 'undefined') {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission().then(state => {
+                    if(state === 'granted') window.addEventListener('devicemotion', onDeviceMotion);
+                });
+            } else {
+                window.addEventListener('devicemotion', onDeviceMotion);
+            }
+        }
+    }
+
+    function initializeGeolocation() {
+        navigator.geolocation.watchPosition((p) => {
+            currentLocation = { lat: p.coords.latitude.toFixed(4), lng: p.coords.longitude.toFixed(4) };
+            document.getElementById('locationStatus').innerText = `${currentLocation.lat}, ${currentLocation.lng}`;
+        });
+    }
+
+    function simulateDesktopMotion() { detectShake(); }
+
+    function sendManualAlert() {
+        socket.emit('manual_alert', { message: 'SOS_SIGNAL', location: currentLocation });
+        showBannerAlert();
+    }
+  </script>
 </body>
 </html>
