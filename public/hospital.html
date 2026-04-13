@@ -219,7 +219,9 @@
     attributionControl: false 
   }).setView([26.8467, 80.9462], 13);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+  L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    subdomains:['mt0','mt1','mt2','mt3']
+}).addTo(map);
 
   const dataContainer = document.getElementById("data-container");
 
