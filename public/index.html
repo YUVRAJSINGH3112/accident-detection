@@ -2,956 +2,262 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Accident Detection System</title>
-  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suraksha | Tactical Command Center</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    :root {
+      --bg: #030712;
+      --card-bg: rgba(17, 24, 39, 0.8);
+      --accent: #00f2ff;
+      --danger: #ff0055;
+      --border: rgba(0, 242, 255, 0.2);
+      --map-shadow: 0 0 40px rgba(0, 242, 255, 0.1);
     }
 
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
+      font-family: 'Space Grotesk', sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: #e2e8f0;
       display: flex;
-      justify-content: center;
-      align-items: center;
+      height: 100vh;
+      overflow: hidden;
       padding: 20px;
+      box-sizing: border-box;
+      gap: 20px;
     }
 
-    .container {
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      max-width: 500px;
-      width: 100%;
-      padding: 40px;
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(var(--border) 1px, transparent 1px);
+      background-size: 30px 30px;
+      opacity: 0.2;
+      z-index: -1;
     }
 
-    h1 {
-      color: #333;
-      text-align: center;
-      margin-bottom: 10px;
-      font-size: 28px;
+    #sidebar {
+      width: 400px;
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--map-shadow);
     }
 
-    .subtitle {
-      color: #666;
-      text-align: center;
-      margin-bottom: 30px;
-      font-size: 14px;
+    .sidebar-header {
+      padding: 25px;
+      border-bottom: 1px solid var(--border);
     }
 
-    .status-section {
-      background: #f5f5f5;
-      padding: 20px;
-      border-radius: 10px;
-      margin-bottom: 30px;
-      border-left: 4px solid #667eea;
-    }
-
-    .status-label {
-      font-size: 12px;
-      color: #999;
+    h2 {
+      margin: 0;
+      font-size: 1.4rem;
+      letter-spacing: 2px;
       text-transform: uppercase;
-      margin-bottom: 8px;
+      color: var(--accent);
+      text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
     }
 
-    .status {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .status-indicator {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-
-    .connected .status-indicator {
-      background: #4caf50;
-    }
-
-    .disconnected .status-indicator {
-      background: #f44336;
-      animation: none;
-    }
-
-    .status-text {
-      color: #333;
-    }
-
-    .connected .status-text {
-      color: #4caf50;
-    }
-
-    .disconnected .status-text {
-      color: #f44336;
-    }
-
-    .client-count {
-      color: #666;
-      font-size: 14px;
-      margin-top: 10px;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 30px;
-    }
-
-    button {
+    #data-container {
       flex: 1;
-      padding: 14px 20px;
-      border: none;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .incident-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      padding: 15px;
+      margin-bottom: 15px;
       border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
+      transition: 0.3s;
+      animation: slideIn 0.4s ease-out;
+    }
+
+    /* Map Box Wrapper with AUTOMATIC animation */
+    .map-wrapper {
+      flex: 1;
+      position: relative;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      background: #000;
+      /* Automatic 1.5s breathing effect */
+      animation: autoGlow 1.5s ease-in-out infinite alternate;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      filter: grayscale(0.5) contrast(1.2) brightness(0.8);
+      /* Automatic 1.5s zooming effect */
+      animation: autoZoom 1.5s ease-in-out infinite alternate;
+    }
+
+    /* Animation for the Border and Shadow Glow */
+    @keyframes autoGlow {
+      0% {
+        border-color: var(--border);
+        box-shadow: 0 0 20px rgba(0, 242, 255, 0.1);
+      }
+      100% {
+        border-color: var(--accent);
+        box-shadow: 0 0 50px rgba(0, 242, 255, 0.3);
+      }
+    }
+
+    /* Animation for the Map Zoom and Color Clarity */
+    @keyframes autoZoom {
+      0% {
+        transform: scale(1);
+        filter: grayscale(0.5) contrast(1.2) brightness(0.8);
+      }
+      100% {
+        transform: scale(1.04);
+        filter: grayscale(0.1) contrast(1.1) brightness(0.95);
+      }
+    }
+
+    .hud-corner {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border: 2px solid var(--accent);
+      z-index: 1000;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .top-left { top: 15px; left: 15px; border-right: 0; border-bottom: 0; }
+    .top-right { top: 15px; right: 15px; border-left: 0; border-bottom: 0; }
+    .bottom-left { bottom: 15px; left: 15px; border-right: 0; border-top: 0; }
+    .bottom-right { bottom: 15px; right: 15px; border-left: 0; border-top: 0; }
+
+    .btn-action {
+      margin-top: 15px;
+      width: 100%;
+      padding: 12px;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-weight: bold;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: 0.3s;
     }
 
-    .btn-movement {
-      background: #2196F3;
-      color: white;
+    .btn-action:hover {
+      background: var(--accent);
+      color: #000;
     }
 
-    .btn-movement:hover:not(:disabled) {
-      background: #1976D2;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 15px rgba(33, 150, 243, 0.3);
+    .marker-ripple {
+      width: 15px; height: 15px;
+      background: var(--danger);
+      border-radius: 50%;
+      box-shadow: 0 0 15px var(--danger);
+      position: relative;
     }
-
-    .btn-movement:active:not(:disabled) {
-      transform: translateY(0);
-    }
-
-    .btn-alert {
-      background: #ff6b6b;
-      color: white;
-    }
-
-    .btn-alert:hover:not(:disabled) {
-      background: #ee5a52;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 15px rgba(255, 107, 107, 0.3);
-    }
-
-    .btn-alert:active:not(:disabled) {
-      transform: translateY(0);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .info-box {
-      background: #e3f2fd;
-      border-left: 4px solid #2196F3;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-    }
-
-    .info-box h3 {
-      color: #1976D2;
-      font-size: 14px;
-      margin-bottom: 8px;
-    }
-
-    .info-box p {
-      color: #666;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    .alert-box {
-      background: #ffebee;
-      border-left: 4px solid #f44336;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      display: none;
-    }
-
-    .alert-box.show {
-      display: block;
-      animation: slideIn 0.3s ease;
-    }
-
-    .alert-box h3 {
-      color: #c62828;
-      font-size: 16px;
-      margin-bottom: 8px;
-      font-weight: 700;
-    }
-
-    .alert-box p {
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 8px;
-    }
-
-    .alert-box .timestamp {
-      color: #999;
-      font-size: 12px;
-    }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateX(-20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
+    .marker-ripple::after {
+      content: ""; position: absolute; inset: 0;
+      border: 2px solid var(--danger);
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
     }
 
     @keyframes pulse {
-      0%, 100% {
-        opacity: 1;
-      }
-      50% {
-        opacity: 0.5;
-      }
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(4); opacity: 0; }
     }
 
-    .logs-section {
-      background: #f5f5f5;
-      border-radius: 10px;
-      padding: 15px;
-      max-height: 250px;
-      overflow-y: auto;
-    }
-
-    .logs-title {
-      font-size: 12px;
-      color: #999;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      font-weight: 600;
-    }
-
-    .log-entry {
-      font-size: 12px;
-      color: #666;
-      padding: 6px 0;
-      border-bottom: 1px solid #eee;
-      font-family: 'Courier New', monospace;
-    }
-
-    .log-entry:last-child {
-      border-bottom: none;
-    }
-
-    .log-entry.alert {
-      color: #f44336;
-      font-weight: 600;
-      background: #ffebee;
-      padding: 8px 6px;
-      border-radius: 4px;
-      margin-bottom: 5px;
-    }
-
-    .log-entry.success {
-      color: #4caf50;
-    }
-
-    .phone-status {
-      background: #fff9e6;
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 13px;
-      color: #666;
-    }
-
-    .phone-status p {
-      margin: 6px 0;
-      font-family: 'Courier New', monospace;
-    }
-
-    .phone-status p strong {
-      color: #667eea;
-      font-weight: 600;
-    }
-
-    .motion-active {
-      background: #fff3cd !important;
-      border-left: 4px solid #ff9800 !important;
-      padding: 15px;
-    }
-
-    .shake-indicator {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      background: #ff9800;
-      border-radius: 50%;
-      margin-right: 8px;
-      animation: shake-pulse 0.5s infinite;
-    }
-
-    @keyframes shake-pulse {
-      0%, 100% {
-        opacity: 1;
-        transform: scale(1);
-      }
-      50% {
-        opacity: 0.5;
-        transform: scale(0.8);
-      }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>🚨 Accident Detection</h1>
-    <p class="subtitle">Real-time notification system</p>
 
-    <!-- Connection Status -->
-    <div class="status-section" id="statusSection">
-      <div class="status-label">Connection Status</div>
-      <div class="status disconnected" id="connectionStatus">
-        <div class="status-indicator"></div>
-        <span class="status-text">Connecting...</span>
-      </div>
-      <div class="client-count" id="clientCount">Connected clients: 0</div>
-    </div>
-
-    <!-- Alert Display -->
-    <div class="alert-box" id="alertBox">
-      <h3 id="alertTitle">⚠️ Accident Detected!</h3>
-      <p id="alertMessage">A movement sensor has triggered an accident alert.</p>
-      <div class="timestamp" id="alertTime"></div>
-    </div>
-
-    <!-- Phone Status -->
-    <div class="status-section" id="phoneStatusSection">
-      <div class="status-label">📱 Phone Motion Sensor</div>
-      <div class="phone-status" id="phoneStatus">
-        <p id="motionStatus">🔄 Initializing motion sensor...</p>
-        <p id="locationStatus">📍 Getting location...</p>
-        <p id="accelerationValue">📊 Acceleration: -- m/s²</p>
-        <p id="motionDebug" style="color: #cc00cc; font-weight: bold;">Debug: [waiting]</p>
-      </div>
-    </div>
-
-    <!-- Info Box -->
-    <div class="info-box">
-      <h3>🚨 How it works:</h3>
-      <p><strong>📱 Phone Users:</strong> Shake your phone gently to trigger alert</p>
-      <p><strong>💻 Laptop/Desktop:</strong> Click "💻 Desktop Motion" button</p>
-      <p><strong>🌍 Real-time Location:</strong> Automatically shows Lucknow, India + Pin Code</p>
-      <p><strong>📡 Real-time:</strong> All connected clients get instant notifications</p>
-      <p><strong>📍 Location Tracking:</strong> City, Pin Code, and Coordinates sent with alerts</p>
-    </div>
-
-    <!-- Control Buttons -->
-    <div class="button-group">
-      <button class="btn-movement" id="movementBtn" onclick="sendMovement()" disabled>
-        📡 Simulate Movement
-      </button>
-      <button class="btn-alert" id="alertBtn" onclick="sendManualAlert()" disabled>
-        🚨 Manual Alert
-      </button>
-    </div>
-
-    <!-- Debug Button -->
-    <div style="text-align: center; margin-bottom: 15px;">
-      <button onclick="testStopMotionDetection()" style="padding: 8px 12px; font-size: 12px; background: #666; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px;">
-        🧪 Test Shake
-      </button>
-      <button onclick="simulateDesktopMotion()" style="padding: 8px 12px; font-size: 12px; background: #9c27b0; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px;">
-        💻 Desktop Motion
-      </button>
-      <button onclick="showLocationHistoryPopup()" style="padding: 8px 12px; font-size: 12px; background: #0066cc; color: white; border: none; border-radius: 5px; cursor: pointer;">
-        📍 Location History (50)
-      </button>
-    </div>
-
-    <!-- Event Logs -->
-    <div class="logs-section">
-      <div class="logs-title">Event Log</div>
-      <div id="logs"></div>
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <h2>📡 Emergency Dashboard</h2>
+    <small style="color: var(--danger); font-weight: bold;">LIVE_LOCATION_ACTIVE</small>
+  </div>
+  
+  <div id="data-container">
+    <div id="empty-state" style="text-align: center; margin-top: 50px; opacity: 0.5;">
+      [ SCANNING GRID... ]
     </div>
   </div>
+</aside>
 
-  <script>
-    // ============ INITIALIZATION ============
-    const socket = io();
-    const maxLogs = 10;
-    let currentLocation = null;
-    let isShaking = false;
-    let lastShakeTime = 0;
-    const shakeThreshold = 5; // LOWERED - Very sensitive (m/s²) - easier to trigger
-    const shakeCooldown = 3000; // 3 seconds between alerts
-    
-    // Location storage constants
-    const LOCATION_STORAGE_KEY = 'lastDeviceLocation';
-    const LOCATION_HISTORY_KEY = 'locationHistory';
-    const LOCATION_UPDATE_INTERVAL = 5000; // Update location every 5 seconds
-    let locationWatchId = null;
-    let locationUpdateTimer = null;
-
-    // ============ DEVICE MOTION / SHAKE DETECTION ============
-
-    function initializeMotionDetection() {
-      updateMotionDebug('Checking DeviceMotionEvent support...');
-      
-      // Check if this is a mobile device with motion sensors
-      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      if (typeof DeviceMotionEvent === 'undefined') {
-        console.log('Device motion API not available - Desktop or unsupported browser');
-        updateMotionStatus('💻 Desktop - Use simulation buttons');
-        updateMotionDebug('Desktop detected - Motion simulation available');
-        addLog('✓ Desktop mode: Use buttons to trigger alerts', 'success');
-        return;
-      }
-
-      console.log('DeviceMotionEvent available:', typeof DeviceMotionEvent);
-
-      // Check if requestPermission is available (iOS 13+)
-      if (typeof DeviceMotionEvent.requestPermission === 'function') {
-        console.log('Requesting DeviceMotionEvent permission (iOS)...');
-        updateMotionDebug('📱 Requesting iOS motion permission...');
-        
-        DeviceMotionEvent.requestPermission()
-          .then(permissionState => {
-            console.log('Motion permission state:', permissionState);
-            
-            if (permissionState === 'granted') {
-              updateMotionDebug('✅ iOS Permission granted');
-              window.addEventListener('devicemotion', onDeviceMotion);
-              updateMotionStatus('✅ Motion sensor ACTIVE (iOS)');
-              addLog('✓ iOS Motion sensors enabled', 'success');
-              console.log('Motion listener added (iOS)');
-            } else {
-              updateMotionDebug('❌ iOS Permission denied: ' + permissionState);
-              updateMotionStatus('❌ Motion permission ' + permissionState);
-              addLog('✗ Please enable motion in iOS Settings', 'alert');
-            }
-          })
-          .catch((error) => {
-            console.error('Permission request error:', error);
-            updateMotionDebug('⚠️ iOS Error: ' + error.message);
-            // Try adding listener anyway
-            try {
-              window.addEventListener('devicemotion', onDeviceMotion);
-              updateMotionStatus('✅ Motion sensor ACTIVE (iOS fallback)');
-            } catch (e) {
-              updateMotionStatus('❌ Failed to enable motion sensor');
-            }
-          });
-      } else if (isMobileDevice) {
-        // Android or older mobile browsers - no permission needed
-        console.log('Android/Mobile: Adding motion listener without permission...');
-        updateMotionDebug('📱 Android motion detection starting...');
-        
-        try {
-          window.addEventListener('devicemotion', onDeviceMotion,true);
-          updateMotionStatus('✅ Motion sensor ACTIVE (Android)');
-          addLog('✓ Android Motion sensors enabled', 'success');
-          updateMotionDebug('✅ Motion listener active');
-          console.log('Motion listener added (Android)');
-        } catch (error) {
-          console.error('Error adding motion listener:', error);
-          updateMotionDebug('❌ Error: ' + error.message);
-          updateMotionStatus('❌ Failed to enable motion sensor');
-        }
-      } else {
-        // Desktop
-        console.log('Desktop detected - No motion sensors');
-        updateMotionStatus('💻 Desktop - Click buttons to test');
-        updateMotionDebug('Desktop mode active');
-        addLog('✓ Desktop: Use simulation buttons', 'success');
-      }
-    }
-
-    // 🔥 (ye variable top me ek baar define karna)
-let lastAcceleration = 0;
-
-function onDeviceMotion(event) {
-  const acc = event.accelerationIncludingGravity;
-
-  if (!acc) {
-    updateMotionDebug('⚠️ No acceleration data');
-    return;
-  }
-
-  const x = acc.x || 0;
-  const y = acc.y || 0;
-  const z = acc.z || 0;
-
-  // ✅ current magnitude
-  const current = Math.sqrt(x * x + y * y + z * z);
-
-  // ✅ delta (sudden change)
-  const delta = Math.abs(current - lastAcceleration);
-
-  lastAcceleration = current;
-
-  // UI update
-  document.getElementById('accelerationValue').innerHTML =
-    `📊 Acc: ${current.toFixed(2)} | Δ: ${delta.toFixed(2)}`;
-
-  updateMotionDebug(`Δ: ${delta.toFixed(2)} | Threshold: 5`);
-
-  // 🔥 Shake detection
-  if (delta > 5) {
-    console.log("🚨 SHAKE DETECTED");
-    detectShake();
-  }
-}
-
-    function detectShake() {
-      const now = Date.now();
-      
-      // Only trigger if enough time has passed since last shake
-      if (now - lastShakeTime > shakeCooldown) {
-        isShaking = true;
-        lastShakeTime = now;
-        
-        console.log('📱 Phone SHAKEN! Sending alert...');
-        addLog('📱 PHONE SHAKEN DETECTED!', 'alert');
-        updateMotionDebug('🚨 SHAKE DETECTED - Alert sent!');
-        
-        // Send shake event to server with current/last location
-        const shakeData = {
-          sensorType: 'Phone Accelerometer',
-          intensity: 'HIGH',
-          location: currentLocation || getLastSavedLocation() || { lat: 'Unknown', lng: 'Unknown' },
-          timestamp: new Date().toISOString(),
-          detectionTime: new Date().toLocaleTimeString()
-        };
-        
-        socket.emit('movement', shakeData);
-        playNotificationSound();
-        
-        // Reset shake flag after cooldown
-        setTimeout(() => {
-          isShaking = false;
-          updateMotionDebug('Ready for next shake...');
-        }, shakeCooldown);
-      } else {
-        const timeLeft = Math.ceil((shakeCooldown - (now - lastShakeTime)) / 1000);
-        updateMotionDebug(`⏳ Cooldown: ${timeLeft}s remaining`);
-      }
-    }
-
-    function updateMotionStatus(status) {
-      document.getElementById('motionStatus').innerHTML = `${status}`;
-    }
-
-    function updateMotionDebug(status) {
-      document.getElementById('motionDebug').innerHTML = `🔍 ${status}`;
-    }
-
-    // ============ GEOLOCATION ============
-
- // 🔥 ADD THIS GLOBAL VARIABLE (top me add karna)
-let lastGeoFetchTime = 0;
-
-function initializeGeolocation() {
-  if ('geolocation' in navigator) {
-    console.log('Starting continuous location tracking...');
-    updateMotionDebug('📍 Starting location tracking...');
-    
-    locationWatchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const lat = position.coords.latitude.toFixed(6);
-        const lng = position.coords.longitude.toFixed(6);
-
-        // ✅ FIX: old values preserve (NO flicker)
-        currentLocation = {
-          lat: lat,
-          lng: lng,
-          accuracy: position.coords.accuracy.toFixed(0),
-          altitude: position.coords.altitude ? position.coords.altitude.toFixed(0) : 'N/A',
-          timestamp: new Date().toLocaleTimeString(),
-          fullTimestamp: new Date().toISOString(),
-          speed: position.coords.speed ? position.coords.speed.toFixed(2) : '0.00',
-
-          address: currentLocation?.address || 'Fetching...',
-          city: currentLocation?.city || 'Getting city...',
-          pincode: currentLocation?.pincode || 'Getting pincode...'
-        };
-
-        // ✅ Smooth UI update
-        updateLocationDisplay(currentLocation);
-
-        // Save location
-        saveLocationToStorage(currentLocation);
-
-        // ✅ FIX: throttle reverse geolocation (10 sec)
-        const now = Date.now();
-        if (now - lastGeoFetchTime > 10000) {
-          getReverseGeolocation(lat, lng);
-          lastGeoFetchTime = now;
-        }
-
-        console.log('Location updated:', lat, lng);
-      },
-      (error) => {
-        console.warn('Geolocation error:', error);
-        let errorMsg = 'Location: ';
-        
-        switch(error.code) {
-          case error.PERMISSION_DENIED:
-            errorMsg += '❌ Permission denied';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMsg += '❌ Position unavailable';
-            break;
-          case error.TIMEOUT:
-            errorMsg += '❌ Request timeout';
-            break;
-          default:
-            errorMsg += '❌ Unknown error';
-        }
-        
-        document.getElementById('locationStatus').innerHTML = errorMsg;
-        updateMotionDebug('⚠️ Location error: ' + error.message);
-        addLog('⚠️ Location error: ' + error.message, 'alert');
-
-        showLastSavedLocation();
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000 // 🔥 smoother updates
-      }
-    );
-  } else {
-    document.getElementById('locationStatus').innerHTML = `❌ Geolocation not supported`;
-    addLog('✗ Geolocation not supported', 'alert');
-    showLastSavedLocation();
-  }
-}
-
-// ============ REVERSE GEOLOCATION ============
-
-function getReverseGeolocation(lat, lng) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+<div class="map-wrapper">
+  <div class="hud-corner top-left"></div>
+  <div class="hud-corner top-right"></div>
+  <div class="hud-corner bottom-left"></div>
+  <div class="hud-corner bottom-right"></div>
   
-  fetch(url)
-    .then(response => response.json())
-    .then(data => {
-      const address = data.address || {};
-      const city = address.city || address.town || address.village || 'Unknown';
-      const pincode = address.postcode || 'N/A';
-      const country = address.country || 'Unknown';
-      const state = address.state || '';
+  <div id="map"></div>
+</div>
 
-      // ✅ update only when data comes
-      currentLocation.address = `${city}, ${state}, ${country}`;
-      currentLocation.city = city;
-      currentLocation.pincode = pincode;
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 
-      saveLocationToStorage(currentLocation);
-      updateLocationDisplay(currentLocation);
+<script>
+  const socket = io();
+  socket.emit('join_hospital');
 
-      console.log('Updated address:', currentLocation.address);
-    })
-    .catch(error => {
-      console.warn('Reverse geolocation error:', error);
-    });
-}
+  const map = L.map('map', { 
+    zoomControl: false, 
+    attributionControl: false 
+  }).setView([26.8467, 80.9462], 13);
 
-// ============ UI DISPLAY ============
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-function updateLocationDisplay(location) {
-  const html = `
-    📍 <strong>${location.address || location.city || 'Loading...'}</strong><br>
-    📮 <strong>Pin Code: ${location.pincode || 'N/A'}</strong><br>
-    <small>Coordinates: ${location.lat}, ${location.lng}</small><br>
-    🎯 Accuracy: ±${location.accuracy}m | 📏 Altitude: ${location.altitude}m<br>
-    ⏰ Time: ${location.timestamp}<br>
-    💨 Speed: ${location.speed} m/s
-  `;
-  document.getElementById('locationStatus').innerHTML = html;
-}
+  const dataContainer = document.getElementById("data-container");
 
-// ============ STORAGE ============
+  socket.on('accident_detected', (data) => {
+    document.getElementById('empty-state')?.remove();
 
-function saveLocationToStorage(location) {
-  try {
-    localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(location));
+    const loc = data.sensorData?.location;
+    if (!loc) return;
 
-    let history = JSON.parse(localStorage.getItem(LOCATION_HISTORY_KEY) || '[]');
-    history.push({
-      ...location,
-      savedAt: new Date().toISOString()
+    const lat = parseFloat(loc.lat);
+    const lng = parseFloat(loc.lng);
+
+    const customIcon = L.divIcon({
+      className: 'custom-marker',
+      html: '<div class="marker-ripple"></div>',
+      iconSize: [15, 15]
     });
 
-    if (history.length > 50) {
-      history = history.slice(-50);
-    }
+    L.marker([lat, lng], { icon: customIcon }).addTo(map);
+    map.flyTo([lat, lng], 15);
 
-    localStorage.setItem(LOCATION_HISTORY_KEY, JSON.stringify(history));
-  } catch (e) {
-    console.warn('Storage error:', e);
-  }
-}
+    const card = document.createElement('div');
+    card.className = 'incident-card';
+    card.innerHTML = `
+      <div style="font-size: 0.7rem; color: var(--danger); margin-bottom: 5px;">▶ CRITICAL DETECTED</div>
+      <h3 style="margin: 0; font-size: 1rem;">SEC: ${Math.floor(lat)}.${Math.floor(lng)}</h3>
+      <p style="font-size: 0.8rem; color: #94a3b8; margin: 10px 0;">
+        Time: ${new Date().toLocaleTimeString()}<br>
+        Source: ${data.source || 'REMOTE_NODE'}
+      </p>
+      <button class="btn-action" onclick="window.open('https://www.google.com/maps?q=${lat},${lng}')">
+        NAVIGATE
+      </button>
+    `;
 
-// ============ LAST LOCATION ============
+    dataContainer.insertBefore(card, dataContainer.firstChild);
+  });
+</script>
 
-function showLastSavedLocation() {
-  try {
-    const lastLocation = localStorage.getItem(LOCATION_STORAGE_KEY);
-
-    if (lastLocation) {
-      const location = JSON.parse(lastLocation);
-
-      const html = `
-        📍 <strong>LAST SAVED: ${location.address || location.city}</strong><br>
-        📮 <strong>Pin Code: ${location.pincode}</strong><br>
-        <small>${location.lat}, ${location.lng}</small><br>
-        ⏰ ${location.timestamp}
-      `;
-
-      document.getElementById('locationStatus').innerHTML = html;
-    }
-  } catch (e) {
-    console.warn('Error reading last location:', e);
-  }
-}
-
-// ============ HISTORY ============
-
-function getLocationHistory() {
-  try {
-    return JSON.parse(localStorage.getItem(LOCATION_HISTORY_KEY) || '[]');
-  } catch (e) {
-    return [];
-  }
-}
-    // ============ Socket Events ============
-
-    socket.on('connect', () => {
-      console.log('Connected to server:', socket.id);
-      updateConnectionStatus(true);
-      addLog('✓ Connected to server', 'success');
-      
-      // Initialize motion and location sensors
-      initializeMotionDetection();
-      initializeGeolocation();
-    });
-
-    socket.on('disconnect', () => {
-      console.log('Disconnected from server');
-      updateConnectionStatus(false);
-      addLog('✗ Disconnected from server', 'alert');
-    });
-
-    socket.on('accident_detected', (data) => {
-      console.log('Accident detected event received:', data);
-      displayAlert(data);
-      addLog(`🚨 ${data.source}: ${data.message}`, 'alert');
-      playNotificationSound();
-    });
-
-    socket.on('client_count', (count) => {
-      console.log('Connected clients:', count);
-      document.getElementById('clientCount').textContent = `Connected clients: ${count}`;
-    });
-
-    // ============ UI Functions ============
-
-    function updateConnectionStatus(isConnected) {
-      const statusElement = document.getElementById('connectionStatus');
-      const movementBtn = document.getElementById('movementBtn');
-      const alertBtn = document.getElementById('alertBtn');
-
-      if (isConnected) {
-        statusElement.className = 'status connected';
-        statusElement.innerHTML = '<div class="status-indicator"></div><span class="status-text">Connected</span>';
-        movementBtn.disabled = false;
-        alertBtn.disabled = false;
-      } else {
-        statusElement.className = 'status disconnected';
-        statusElement.innerHTML = '<div class="status-indicator"></div><span class="status-text">Disconnected</span>';
-        movementBtn.disabled = true;
-        alertBtn.disabled = true;
-      }
-    }
-
-    function sendMovement() {
-      const movementData = {
-        sensorId: 'SENSOR-001',
-        intensity: Math.random() * 100,
-        location: currentLocation || getLastSavedLocation() || { lat: 'Unknown', lng: 'Unknown' },
-        timestamp: new Date().toISOString(),
-        detectionTime: new Date().toLocaleTimeString()
-      };
-      
-      socket.emit('movement', movementData);
-      console.log('Sent movement event:', movementData);
-      addLog('📡 Sent movement sensor data with location');
-    }
-
-    function sendManualAlert() {
-      socket.emit('manual_alert', {
-        message: 'Manual accident alert triggered by user',
-        location: currentLocation || getLastSavedLocation() || { lat: 'Unknown', lng: 'Unknown' },
-        timestamp: new Date().toISOString(),
-        detectionTime: new Date().toLocaleTimeString()
-      });
-      console.log('Sent manual alert');
-      addLog('🚨 Sent manual alert with location');
-    }
-
-    function getLastSavedLocation() {
-      try {
-        const lastLocation = localStorage.getItem(LOCATION_STORAGE_KEY);
-        return lastLocation ? JSON.parse(lastLocation) : null;
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function displayAlert(data) {
-      const alertBox = document.getElementById('alertBox');
-      const alertTitle = document.getElementById('alertTitle');
-      const alertMessage = document.getElementById('alertMessage');
-      const alertTime = document.getElementById('alertTime');
-
-      const detectionTime = data.detectionTime || new Date().toLocaleTimeString();
-      
-      alertTitle.textContent = '⚠️ ' + (data.message || 'Accident Detected!');
-      alertMessage.innerHTML = `<strong>Source:</strong> ${data.source}<br>
-        <strong>Time:</strong> ${detectionTime}<br>
-        ${data.sensorData && data.sensorData.location 
-          ? `<strong>📍 Location:</strong> ${data.sensorData.location.lat}, ${data.sensorData.location.lng}<br>
-             <strong>🎯 Accuracy:</strong> ±${data.sensorData.location.accuracy}m<br>
-             <strong>📏 Altitude:</strong> ${data.sensorData.location.altitude}m`
-          : '<strong>📍 Location:</strong> Capturing...'}`;
-
-      alertBox.classList.add('show');
-
-      setTimeout(() => {
-        alertBox.classList.remove('show');
-      }, 5000);
-
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Accident Detected!', {
-          body: data.message,
-          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🚨</text></svg>'
-        });
-      }
-    }
-
-    function addLog(message, type = 'info') {
-      const logsContainer = document.getElementById('logs');
-      const logEntry = document.createElement('div');
-      logEntry.className = `log-entry ${type}`;
-      const timestamp = new Date().toLocaleTimeString();
-      logEntry.textContent = `[${timestamp}] ${message}`;
-      
-      logsContainer.insertBefore(logEntry, logsContainer.firstChild);
-
-      while (logsContainer.children.length > maxLogs) {
-        logsContainer.removeChild(logsContainer.lastChild);
-      }
-    }
-
-    function playNotificationSound() {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 800;
-      oscillator.type = 'sine';
-
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.5);
-    }
-
-    // ============ DEBUG FUNCTION ============
-    function testStopMotionDetection() {
-      console.log('🧪 Testing shake detection manually...');
-      addLog('🧪 Manual shake test triggered', 'alert');
-      
-      // Manually trigger shake detection as if phone was shaken
-      detectShake();
-      
-      updateMotionDebug('🧪 Test completed - check if alert appears');
-    }
-
-    function simulateDesktopMotion() {
-      console.log('💻 Simulating desktop motion...');
-      addLog('💻 Desktop motion simulated', 'alert');
-      
-      // Simulate motion from desktop
-      const simulatedMotionEvent = {
-        accelerationIncludingGravity: {
-          x: (Math.random() - 0.5) * 50,
-          y: (Math.random() - 0.5) * 50,
-          z: (Math.random() - 0.5) * 50
-        }
-      };
-      
-      // Process as if it was real motion
-      onDeviceMotion(simulatedMotionEvent);
-      
-      updateMotionDebug('🧪 Desktop motion simulation complete');
-    }
-
-    function showLocationHistoryPopup() {
-      const history = getLocationHistory();
-      
-      if (history.length === 0) {
-        alert('📭 No location history yet. Locations are saved automatically.');
-        return;
-      }
-      
-      let historyText = `📍 LOCATION HISTORY (Last ${history.length} saved locations)\n\n`;
-      
-      history.forEach((loc, index) => {
-        historyText += `${index + 1}. ${loc.city || loc.lat}, ${loc.pincode || loc.lng}\n`;
-        historyText += `   ⏰ ${loc.timestamp} | 🎯 ±${loc.accuracy}m | 📏 ${loc.altitude}m\n\n`;
-      });
-      
-      historyText += '\n✅ All locations saved in browser storage\n';
-      historyText += '📌 Last location persists even if app closes';
-      
-      alert(historyText);
-    }
-
-    // Show last saved location on page load
-    window.addEventListener('load', () => {
-      console.log('Page loaded - checking for saved location...');
-      const lastLocation = getLastSavedLocation();
-      if (lastLocation) {
-        console.log('Found last saved location:', lastLocation);
-      }
-    });
-
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-
-    // Initialize
-    addLog('🌐 Application loaded');
-  </script>
 </body>
 </html>
