@@ -6,7 +6,6 @@
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
     body {
@@ -35,6 +34,7 @@
       border-radius: 10px;
       margin-top: 10px;
       border-left: 5px solid red;
+      animation: fadeIn 0.3s ease;
     }
 
     .tagline {
@@ -52,6 +52,17 @@
       cursor: pointer;
       margin-top: 10px;
     }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
   </style>
 </head>
 <body>
@@ -60,17 +71,15 @@
 <div id="sidebar">
   <h2>🚑 Emergency Dashboard</h2>
 
-  <!-- 🔥 Tagline -->
-  <p class="tagline">🚨Life at Risk – Immediate Response Needed</p>
+  <p class="tagline">🚨 Life at Risk – Immediate Response Needed</p>
 
-  <!-- Dynamic data will come here -->
   <div id="data"></div>
 </div>
 
 <!-- Map -->
 <div id="map"></div>
 
-<!-- Leaflet JS -->
+<!-- Scripts -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 
@@ -78,16 +87,18 @@
   const socket = io();
 
   socket.emit('join_hospital');
+
   // Map init
   const map = L.map('map').setView([26.8467, 80.9462], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; Sukrsha Help'
+    attribution: '&copy; Suraksha Help'
   }).addTo(map);
 
-  let userMarker;
-
   const dataDiv = document.getElementById("data");
+
+  // Store all markers
+  const markers = [];
 
   // 🚨 Listen accident event
   socket.on('accident_detected', (data) => {
@@ -98,20 +109,21 @@
     const lat = parseFloat(loc.lat);
     const lng = parseFloat(loc.lng);
 
-    // 🔴 Map marker
-    if (userMarker) map.removeLayer(userMarker);
-
-    userMarker = L.marker([lat, lng]).addTo(map)
+    // ✅ ADD NEW MARKER (no delete)
+    const marker = L.marker([lat, lng]).addTo(map)
       .bindPopup("🚨 Accident Location")
       .openPopup();
 
+    markers.push(marker);
+
+    // Optional: zoom to latest
     map.setView([lat, lng], 15);
 
-    // 📋 Sidebar update
+    // ✅ ADD NEW CARD ON TOP (no overwrite)
     dataDiv.innerHTML = `
       <div class="card">
-        <h3>🚨 Active Emergency</h3>
-        <p><strong>Time:</strong> ${data.detectionTime}</p>
+        <h3>🚨 Emergency Alert</h3>
+        <p><strong>Time:</strong> ${data.detectionTime || new Date().toLocaleTimeString()}</p>
         <p><strong>Source:</strong> ${data.source}</p>
         <p><strong>Latitude:</strong> ${lat}</p>
         <p><strong>Longitude:</strong> ${lng}</p>
@@ -121,7 +133,7 @@
           📍 Open in Google Maps
         </button>
       </div>
-    `;
+    ` + dataDiv.innerHTML;
   });
 
   function openMap(lat, lng) {
